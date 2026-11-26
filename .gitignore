@@ -1,0 +1,52 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.*
+
+# Next.js / Build
+.next/
+out/
+dist/
+dist-ssr/
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing & Coverage
+coverage/
+
+# Environment variables (nunca versionar segredos reais)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# Supabase local
+supabase/.temp
+
+# AI planning & prompt artifacts (mantidos apenas localmente)
+.ai/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor & OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
