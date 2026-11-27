@@ -21,6 +21,7 @@ import {
   CardTitle,
 } from "@/shared/components/ui/card";
 import { Label } from "@/shared/components/ui/label";
+import type { PostClassDeliveryChannel } from "@/shared/types/database";
 
 function pickSupportedRecorderMimeType(): string {
   if (typeof MediaRecorder === "undefined") {
@@ -43,13 +44,17 @@ function pickSupportedRecorderMimeType(): string {
 
 interface ScreeningSubmissionFormProps {
   initialInterests: string[];
+  initialDeliveryChannel?: PostClassDeliveryChannel;
 }
 
 export function ScreeningSubmissionForm({
   initialInterests,
+  initialDeliveryChannel = "platform",
 }: ScreeningSubmissionFormProps) {
   const [selectedInterests, setSelectedInterests] =
     useState<string[]>(initialInterests);
+  const [deliveryChannel, setDeliveryChannel] =
+    useState<PostClassDeliveryChannel>(initialDeliveryChannel);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -162,6 +167,7 @@ export function ScreeningSubmissionForm({
 
     const formData = new FormData();
     formData.append("audio", audioFile);
+    formData.append("deliveryChannel", deliveryChannel);
     selectedInterests.forEach((interest) =>
       formData.append("interests", interest),
     );
@@ -175,7 +181,7 @@ export function ScreeningSubmissionForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Etapa 1 — Triagem por Áudio e Interesses</CardTitle>
+        <CardTitle>Triagem de Nível e Preferências</CardTitle>
         <CardDescription>
           Fale por 30 a 60 segundos em inglês sobre sua rotina, trabalho ou algo
           que você gosta. O áudio fica em armazenamento privado e expira em 30
@@ -276,6 +282,45 @@ export function ScreeningSubmissionForm({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <Label>
+              3. Onde você prefere receber o material pós-aula gerado com IA?
+            </Label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setDeliveryChannel("platform")}
+                className={`rounded-md border p-3 text-left transition-colors ${
+                  deliveryChannel === "platform"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-input bg-background hover:bg-accent"
+                }`}
+              >
+                <p className="text-sm font-medium">Dentro da plataforma</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Leia suas correções, exercício de escrita e gabarito na aba
+                  Atividades.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDeliveryChannel("whatsapp")}
+                className={`rounded-md border p-3 text-left transition-colors ${
+                  deliveryChannel === "whatsapp"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    : "border-input bg-background hover:bg-accent"
+                }`}
+              >
+                <p className="text-sm font-medium">No meu WhatsApp</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Receba o resumo e a atividade no WhatsApp (também fica salvo
+                  na plataforma por 30 dias).
+                </p>
+              </button>
             </div>
           </div>
         </CardContent>

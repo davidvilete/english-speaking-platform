@@ -42,6 +42,10 @@ export async function submitScreeningAction(
     };
   }
 
+  const rawChannel = String(formData.get("deliveryChannel") ?? "platform");
+  const deliveryChannel =
+    rawChannel === "whatsapp" ? ("whatsapp" as const) : ("platform" as const);
+
   const audioFile = formData.get("audio");
   if (!(audioFile instanceof File)) {
     return {
@@ -91,7 +95,10 @@ export async function submitScreeningAction(
 
     const { error: profileUpdateError } = await supabase
       .from("profiles")
-      .update({ interests_tags: parsedInterests.data })
+      .update({
+        interests_tags: parsedInterests.data,
+        post_class_delivery_channel: deliveryChannel,
+      })
       .eq("id", session.userId);
 
     if (profileUpdateError) {
@@ -130,6 +137,7 @@ export async function submitScreeningAction(
     }
 
     revalidatePath("/student");
+    revalidatePath("/student/screening");
     return {
       success:
         "Triagem enviada com sucesso! O professor ouvirá seu áudio em breve.",

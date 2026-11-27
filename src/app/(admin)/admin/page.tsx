@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Headphones } from "lucide-react";
+import { Activity, CreditCard, Headphones } from "lucide-react";
 import { requireRole } from "@/modules/auth/session";
 import { AppHeader } from "@/shared/components/app-header";
 import { Button } from "@/shared/components/ui/button";
@@ -30,11 +30,29 @@ export default async function AdminDashboardPage() {
             Painel Administrativo
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Supervisão operacional da plataforma Output 1v2.
+            Supervisão operacional e comercial da plataforma Output 1v2.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <CardTitle className="text-base">Assinaturas e Pix</CardTitle>
+              </div>
+              <CardDescription>
+                Ative planos Trial, Basic (R$ 65,90) e Intermediate (R$ 79,90),
+                cancelamento Netflix e controle CDC 7 dias.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/admin/subscriptions">
+                <Button className="w-full">Gerenciar assinaturas</Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -47,7 +65,9 @@ export default async function AdminDashboardPage() {
             </CardHeader>
             <CardContent>
               <Link href="/teacher/screening">
-                <Button variant="outline">Abrir fila de triagem</Button>
+                <Button variant="outline" className="w-full">
+                  Abrir fila de triagem
+                </Button>
               </Link>
             </CardContent>
           </Card>
@@ -67,7 +87,9 @@ export default async function AdminDashboardPage() {
             </CardHeader>
             <CardContent>
               <a href="/api/health" target="_blank" rel="noopener noreferrer">
-                <Button variant="outline">Consultar /api/health</Button>
+                <Button variant="outline" className="w-full">
+                  Consultar /api/health
+                </Button>
               </a>
             </CardContent>
           </Card>

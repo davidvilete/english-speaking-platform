@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
+import { formatDateTimeInTimeZone } from "@/shared/lib/date";
 import { createSupabaseServerClient } from "@/shared/lib/supabase/server";
 import type {
   ProficiencyLevel,
@@ -18,18 +19,6 @@ import {
   ScreeningReviewCard,
   type ScreeningReviewItem,
 } from "./_components/screening-review-card";
-
-function formatInTimeZone(isoUtc: string, timeZone: string): string {
-  try {
-    return new Intl.DateTimeFormat("pt-BR", {
-      dateStyle: "short",
-      timeStyle: "short",
-      timeZone,
-    }).format(new Date(isoUtc));
-  } catch {
-    return isoUtc;
-  }
-}
 
 interface RawSubmissionRow {
   id: string;
@@ -80,8 +69,16 @@ export default async function TeacherScreeningPage() {
     .map((row) => ({
       submissionId: row.id,
       status: row.status,
-      createdAtFormatted: formatInTimeZone(row.created_at, profile.timezone),
-      expiresAtFormatted: formatInTimeZone(row.expires_at, profile.timezone),
+      createdAtFormatted: formatDateTimeInTimeZone(
+        row.created_at,
+        profile.timezone,
+        "short",
+      ),
+      expiresAtFormatted: formatDateTimeInTimeZone(
+        row.expires_at,
+        profile.timezone,
+        "short",
+      ),
       teacherNotes: row.teacher_notes,
       student: {
         id: row.student!.id,

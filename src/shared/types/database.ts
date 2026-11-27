@@ -32,6 +32,8 @@ export type BookingStatus =
 
 export type PostClassStatus = "draft" | "published";
 
+export type PostClassDeliveryChannel = "platform" | "whatsapp";
+
 export type ErrorSeverity = "error" | "critical";
 
 export interface ProfileRow {
@@ -42,6 +44,7 @@ export interface ProfileRow {
   timezone: string;
   proficiency_level: ProficiencyLevel | null;
   interests_tags: string[];
+  post_class_delivery_channel: PostClassDeliveryChannel;
   lgpd_consent_at: string;
   is_adult_confirmed: boolean;
   created_at: string;
@@ -83,6 +86,50 @@ export interface SystemErrorLogRow {
   context_json: Record<string, unknown>;
   resolved: boolean;
   created_at: string;
+}
+
+export interface ClassSessionRow {
+  id: string;
+  teacher_id: string;
+  starts_at_utc: string;
+  duration_minutes: number;
+  capacity: number;
+  locked_level: ProficiencyLevel | null;
+  topic_theme: string | null;
+  meet_url: string;
+  status: ClassSessionStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Projeção segura de sessão para listagens abertas ao aluno:
+ * NUNCA expõe `meet_url`.
+ */
+export type PublicClassSessionSlot = Omit<ClassSessionRow, "meet_url">;
+
+export interface BookingRow {
+  id: string;
+  session_id: string;
+  student_id: string;
+  status: BookingStatus;
+  checked_in_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PostClassMaterialRow {
+  id: string;
+  session_id: string;
+  student_id: string;
+  teacher_raw_notes: string;
+  ai_generated_draft: string | null;
+  final_content_markdown: string;
+  status: PostClassStatus;
+  published_at: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Database {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Headphones } from "lucide-react";
+import { ArrowRight, CalendarDays, Headphones } from "lucide-react";
 import { requireRole } from "@/modules/auth/session";
 import { AppHeader } from "@/shared/components/app-header";
 import { Button } from "@/shared/components/ui/button";
@@ -21,7 +21,7 @@ export default async function TeacherDashboardPage() {
   const [
     { count: pendingCount },
     { count: approvedCount },
-    { count: redirectedCount },
+    { count: openSessionsCount },
   ] = await Promise.all([
     supabase
       .from("screening_submissions")
@@ -32,9 +32,9 @@ export default async function TeacherDashboardPage() {
       .select("id", { head: true, count: "exact" })
       .eq("status", "approved"),
     supabase
-      .from("screening_submissions")
+      .from("class_sessions")
       .select("id", { head: true, count: "exact" })
-      .eq("status", "redirected"),
+      .in("status", ["open", "full", "in_progress"]),
   ]);
 
   return (
@@ -51,8 +51,8 @@ export default async function TeacherDashboardPage() {
             Painel do Professor
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie as triagens por áudio e classifique o nível de fala dos
-            candidatos para o pareamento 1v2.
+            Gerencie triagens por áudio, horários disponíveis 1v2 e check-ins de
+            presença.
           </p>
         </div>
 
@@ -71,33 +71,58 @@ export default async function TeacherDashboardPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardDescription>Redirecionados (Base)</CardDescription>
-              <CardTitle className="text-3xl">{redirectedCount ?? 0}</CardTitle>
+              <CardDescription>Sessões Ativas na Agenda</CardDescription>
+              <CardTitle className="text-3xl">
+                {openSessionsCount ?? 0}
+              </CardTitle>
             </CardHeader>
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Headphones className="h-5 w-5 text-primary" />
-              <CardTitle>Fila de Triagem por Áudio</CardTitle>
-            </div>
-            <CardDescription>
-              Ouça os áudios privados via Signed URL temporária (5 min), defina
-              o nível de fala (A2, B1 ou B2) liberando o plano Trial, ou oriente
-              iniciantes absolutos para cursos externos.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/teacher/screening">
-              <Button>
-                Abrir painel de triagem
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-primary" />
+                <CardTitle>Agenda e Presença (1v2)</CardTitle>
+              </div>
+              <CardDescription>
+                Abra horários de sexta/sábado com link do Google Meet, acompanhe
+                check-ins (10 min antes) e marque presença ou falta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/teacher/schedule">
+                <Button>
+                  Gerenciar agenda
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Headphones className="h-5 w-5 text-primary" />
+                <CardTitle>Fila de Triagem por Áudio</CardTitle>
+              </div>
+              <CardDescription>
+                Ouça os áudios privados via Signed URL temporária (5 min),
+                defina o nível de fala (A2, B1 ou B2) ou oriente iniciantes
+                absolutos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/teacher/screening">
+                <Button variant="outline">
+                  Abrir painel de triagem
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );

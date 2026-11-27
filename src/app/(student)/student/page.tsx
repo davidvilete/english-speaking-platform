@@ -1,9 +1,13 @@
-import { CheckCircle2, Clock, Compass } from "lucide-react";
-import { requireRole } from "@/modules/auth/session";
+import Link from "next/link";
 import {
-  EXTERNAL_FOUNDATION_COURSES,
-  PROFICIENCY_LEVEL_META,
-} from "@/modules/screening/domain";
+  ArrowRight,
+  BookOpenCheck,
+  CalendarDays,
+  Lock,
+  Mic,
+} from "lucide-react";
+import { requireRole } from "@/modules/auth/session";
+import { PROFICIENCY_LEVEL_META } from "@/modules/screening/domain";
 import { AppHeader } from "@/shared/components/app-header";
 import {
   Alert,
@@ -11,6 +15,7 @@ import {
   AlertTitle,
 } from "@/shared/components/ui/alert";
 import { Badge } from "@/shared/components/ui/badge";
+import { Button } from "@/shared/components/ui/button";
 import {
   Card,
   CardContent,
@@ -18,58 +23,73 @@ import {
   CardHeader,
   CardTitle,
 } from "@/shared/components/ui/card";
+import { formatDateTimeInTimeZone } from "@/shared/lib/date";
 import { createSupabaseServerClient } from "@/shared/lib/supabase/server";
 import type {
   ScreeningSubmissionRow,
   SubscriptionRow,
 } from "@/shared/types/database";
-import { ScreeningSubmissionForm } from "./_components/screening-submission-form";
 
-function formatDateInTimeZone(isoUtc: string, timeZone: string): string {
-  try {
-    return new Intl.DateTimeFormat("pt-BR", {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone,
-    }).format(new Date(isoUtc));
-  } catch {
-    return isoUtc;
-  }
-}
+export const dynamic = "force-dynamic";
 
 const PLAN_LABELS: Record<SubscriptionRow["plan_code"], string> = {
-  trial: "Piloto Gratuito (2 aulas teste)",
+  trial: "Degustação Gratuita (2 aulas piloto)",
   basic_1x: "Basic — 1 aula/semana (R$ 65,90/mês)",
   intermediate_2x: "Intermediate — 2 aulas/semana (R$ 79,90/mês)",
 };
 
-export const dynamic = "force-dynamic";
-
 export default async function StudentDashboardPage() {
   const { profile } = await requireRole(["student"]);
   const supabase = await createSupabaseServerClient();
+  const nowIso = new Date().toISOString();
 
-  const [{ data: latestSubmission }, { data: activeSubscription }] =
-    await Promise.all([
-      supabase
-        .from("screening_submissions")
-        .select("*")
-        .eq("student_id", profile.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("subscriptions")
-        .select("*")
-        .eq("student_id", profile.id)
-        .in("status", ["active", "cancel_at_period_end"])
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ]);
+  const [
+    { data: latestSubmission },
+    { data: activeSubscription },
+    { count: usedTrialBookings },
+    { count: publishedMaterialsCount },
+  ] = await Promise.all([
+    supabase
+      .from("screening_submissions")
+      .select("*")
+      .eq("student_id", profile.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("student_id", profile.id)
+      .in("status", ["active", "cancel_at_period_end"])
+      .lte("current_period_start", nowIso)
+      .gt("current_period_end", nowIso)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("bookings")
+      .select("id", { head: true, count: "exact" })
+      .eq("student_id", profile.id)
+      .in("status", ["confirmed", "checked_in", "attended", "no_show"]),
+    supabase
+      .from("post_class_materials")
+      .select("id", { head: true, count: "exact" })
+      .eq("student_id", profile.id)
+      .eq("status", "published"),
+  ]);
 
   const submission = latestSubmission as ScreeningSubmissionRow | null;
   const subscription = activeSubscription as SubscriptionRow | null;
+
+  const isApproved =
+    profile.proficiency_level !== null &&
+    profile.proficiency_level !== "REDIRECTED_EXTERNAL";
+
+  const isTrialExhausted =
+    subscription?.plan_code === "trial" &&
+    (usedTrialBookings ?? 0) >= subscription.weekly_limit;
+
+  const isPaywalled = isApproved && (!subscription || isTrialExhausted);
 
   return (
     <div className="min-h-screen bg-muted/20">
@@ -79,203 +99,199 @@ export default async function StudentDashboardPage() {
         timezone={profile.timezone}
       />
 
-      <main className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Olá, {profile.full_name.split(" ")[0]}
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Acompanhe sua triagem, nível de fala para pareamento 1v2 e status do
-            seu plano.
-          </p>
+      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Bem-vindo(a), {profile.full_name.split(" ")[0]}
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Sua área de membros Output 1v2. Acesse triagem, aulas ao vivo e
+              atividades pós-aula.
+            </p>
+          </div>
+          {profile.proficiency_level &&
+          profile.proficiency_level !== "REDIRECTED_EXTERNAL" ? (
+            <Badge variant="success">
+              {PROFICIENCY_LEVEL_META[profile.proficiency_level].label}
+            </Badge>
+          ) : null}
         </div>
 
-        {/* Caso 1: Candidato sem base mínima -> orientação cordial e bloqueio 1v2 */}
-        {profile.proficiency_level === "REDIRECTED_EXTERNAL" ? (
+        {/* Paywall estilo Mairo Vergara: degustação esgotada ou sem plano pago */}
+        {isPaywalled ? (
+          <Alert variant="warning">
+            <Lock className="mb-1 h-4 w-4" />
+            <AlertTitle>
+              {isTrialExhausted
+                ? "Suas 2 aulas gratuitas foram concluídas!"
+                : "Acesso completo bloqueado — Assinatura necessária"}
+            </AlertTitle>
+            <AlertDescription>
+              Para continuar agendando novas aulas 1v2 e recebendo atividades
+              personalizadas, ative um dos planos mensais via Pix:{" "}
+              <strong>Basic (1x/sem — R$ 65,90/mês)</strong> ou{" "}
+              <strong>Intermediate (2x/sem — R$ 79,90/mês)</strong>. Após
+              confirmar o Pix com a escola, seu acesso é liberado imediatamente
+              aqui.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          {/* Card 1: Triagem de Nível */}
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <Compass className="h-5 w-5 text-amber-600" />
-                <CardTitle>Recomendação antes de iniciar no 1v2</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <Mic className="h-5 w-5 text-primary" />
+                <Badge
+                  variant={
+                    isApproved
+                      ? "success"
+                      : submission?.status === "pending"
+                        ? "warning"
+                        : "secondary"
+                  }
+                >
+                  {isApproved
+                    ? "Aprovado"
+                    : profile.proficiency_level === "REDIRECTED_EXTERNAL"
+                      ? "Orientação"
+                      : submission?.status === "pending"
+                        ? "Em análise"
+                        : "Pendente"}
+                </Badge>
               </div>
+              <CardTitle className="text-base">1. Triagem de Nível</CardTitle>
               <CardDescription>
-                Nossas aulas 1v2 exigem base mínima para sustentar conversação
-                ao vivo com outro aluno.
+                Envie seu áudio, interesses reais e escolha se prefere o
+                pós-aula na plataforma ou no WhatsApp.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {submission?.teacher_notes ? (
-                <Alert variant="warning">
-                  <AlertTitle>Mensagem do professor</AlertTitle>
-                  <AlertDescription>
-                    {submission.teacher_notes}
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-
-              <p className="text-sm text-muted-foreground">
-                Para evoluir com segurança nas 4 habilidades (listening,
-                reading, speaking e writing) antes de voltar para a nossa
-                prática intensiva de output, recomendamos:
-              </p>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                {EXTERNAL_FOUNDATION_COURSES.map((course) => (
-                  <div
-                    key={course.name}
-                    className="rounded-md border bg-background p-4"
-                  >
-                    <p className="font-medium">{course.name}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {course.reason}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                O agendamento de sessões 1v2 permanece indisponível enquanto sua
-                classificação estiver como iniciante absoluto. Assim que
-                construir sua base, teremos prazer em reavaliar você!
-              </p>
+            <CardContent>
+              <Link href="/student/screening">
+                <Button variant="outline" className="w-full">
+                  {isApproved ? "Ver meu perfil de nível" : "Fazer triagem"}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
             </CardContent>
           </Card>
-        ) : profile.proficiency_level ? (
-          /* Caso 2: Aluno aprovado com nível de fala definido */
-          <div className="space-y-4">
-            <Alert variant="success">
-              <CheckCircle2 className="mb-1 h-4 w-4" />
-              <AlertTitle>Triagem aprovada!</AlertTitle>
-              <AlertDescription>
-                Seu nível de fala já foi classificado para o pareamento 1v2.
-              </AlertDescription>
-            </Alert>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardDescription>
-                    Nível de Fala (Pareamento 1v2)
-                  </CardDescription>
-                  <CardTitle className="text-lg">
-                    {PROFICIENCY_LEVEL_META[profile.proficiency_level].label}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-xs text-muted-foreground">
-                    {
-                      PROFICIENCY_LEVEL_META[profile.proficiency_level]
-                        .description
-                    }
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardDescription>Plano Comercial Ativo</CardDescription>
-                  <CardTitle className="text-lg">
-                    {subscription
-                      ? PLAN_LABELS[subscription.plan_code]
-                      : "Aguardando ativação"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {subscription ? (
-                    <p className="text-xs text-muted-foreground">
-                      Vigência até{" "}
-                      <strong>
-                        {formatDateInTimeZone(
-                          subscription.current_period_end,
-                          profile.timezone,
-                        )}
-                      </strong>{" "}
-                      ({profile.timezone}).
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Entre em contato com a administração para ativar seu
-                      plano.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {profile.interests_tags.length > 0 ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">
-                    Seus interesses cadastrados
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-wrap gap-2">
-                  {profile.interests_tags.map((tag) => (
-                    <Badge key={tag} variant="secondary">
-                      {tag}
-                    </Badge>
-                  ))}
-                </CardContent>
-              </Card>
-            ) : null}
-
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle className="text-base">
-                  Agenda de Aulas 1v2 (Próxima entrega — Sprint 2)
-                </CardTitle>
-                <CardDescription>
-                  Em breve você poderá escolher horários de sexta e sábado
-                  filtrados automaticamente pelo seu nível{" "}
-                  <strong>{profile.proficiency_level}</strong> e fazer check-in
-                  10 minutos antes da aula.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </div>
-        ) : submission && submission.status === "pending" ? (
-          /* Caso 3: Triagem enviada e aguardando análise do professor */
-          <Card>
+          {/* Card 2: Aulas 1v2 & Check-in */}
+          <Card className={isPaywalled ? "opacity-85" : undefined}>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                <CardTitle>Triagem em análise pelo professor</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                {isPaywalled ? (
+                  <Lock className="h-5 w-5 text-amber-600" />
+                ) : (
+                  <CalendarDays className="h-5 w-5 text-primary" />
+                )}
+                <Badge variant={isPaywalled ? "warning" : "secondary"}>
+                  {!isApproved
+                    ? "Requer triagem"
+                    : isPaywalled
+                      ? "Bloqueado"
+                      : subscription?.plan_code === "trial"
+                        ? `${Math.max(0, subscription.weekly_limit - (usedTrialBookings ?? 0))} grátis`
+                        : "Liberado"}
+                </Badge>
               </div>
+              <CardTitle className="text-base">
+                2. Aulas 1v2 e Check-in
+              </CardTitle>
               <CardDescription>
-                Recebemos seu áudio e seus interesses. Assim que o professor
-                avaliar, você receberá um e-mail e o status será atualizado
-                aqui.
+                Reserve horários do seu nível e faça check-in 10 min antes para
+                abrir o Google Meet.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p className="text-muted-foreground">
-                Enviado em:{" "}
+            <CardContent>
+              {isApproved ? (
+                <Link href="/student/schedule">
+                  <Button
+                    variant={isPaywalled ? "outline" : "default"}
+                    className="w-full"
+                  >
+                    {isPaywalled
+                      ? "Ver histórico (Assinar para reservar)"
+                      : "Abrir agenda 1v2"}
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              ) : (
+                <Button disabled variant="outline" className="w-full">
+                  <Lock className="h-4 w-4" />
+                  Conclua a triagem primeiro
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 3: Atividades Pós-Aula */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <BookOpenCheck className="h-5 w-5 text-primary" />
+                <Badge variant="secondary">
+                  {publishedMaterialsCount ?? 0} disponíveis
+                </Badge>
+              </div>
+              <CardTitle className="text-base">
+                3. Atividades Pós-Aula
+              </CardTitle>
+              <CardDescription>
+                Correções personalizadas, exercício de escrita e gabarito
+                (canal:{" "}
                 <strong>
-                  {formatDateInTimeZone(
-                    submission.created_at,
+                  {profile.post_class_delivery_channel === "whatsapp"
+                    ? "WhatsApp"
+                    : "Plataforma"}
+                </strong>
+                ).
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Link href="/student/activities">
+                <Button variant="outline" className="w-full">
+                  Abrir atividades
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Resumo do Plano */}
+        <Card>
+          <CardHeader>
+            <CardDescription>Status do seu plano comercial</CardDescription>
+            <CardTitle className="text-lg">
+              {subscription
+                ? PLAN_LABELS[subscription.plan_code]
+                : "Sem plano pago ativo (Conta gratuita)"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-muted-foreground">
+            {subscription ? (
+              <p>
+                Vigência até{" "}
+                <strong>
+                  {formatDateTimeInTimeZone(
+                    subscription.current_period_end,
                     profile.timezone,
                   )}
-                </strong>
+                </strong>{" "}
+                ({profile.timezone}).
               </p>
-              <p className="text-xs text-muted-foreground">
-                Política LGPD: seu áudio de triagem expira automaticamente em{" "}
-                {formatDateInTimeZone(submission.expires_at, profile.timezone)}.
+            ) : (
+              <p>
+                Faça a triagem para liberar suas 2 aulas gratuitas de
+                degustação. Depois, você pode assinar o plano Basic (R$
+                65,90/mês) ou Intermediate (R$ 79,90/mês).
               </p>
-              {profile.interests_tags.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-2">
-                  {profile.interests_tags.map((tag) => (
-                    <Badge key={tag} variant="secondary">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-        ) : (
-          /* Caso 4: Novo aluno ainda sem triagem */
-          <ScreeningSubmissionForm initialInterests={profile.interests_tags} />
-        )}
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
