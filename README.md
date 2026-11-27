@@ -2,7 +2,7 @@
 
 Plataforma web responsiva (desktop e mobile browser) para gestão e operação de aulas ao vivo de conversação em inglês no formato **1v2** (1 professor para 2 alunos pareados por nível de fala), com foco em destravamento de _output_ (fala e escrita) para adultos (18+) com base mínima ou nível intermediário.
 
-> **Status atual:** Estrutura inicial do projeto configurada (sem funcionalidades implementadas). As regras arquiteturais e o plano de entrega estão documentados em `.ai/PROJECT_DNA.md`, `.ai/AI_EXECUTION_GUIDE.md` e `.ai/IMPLEMENTATION_PLAN.md`.
+> **Status atual:** **Sprint 1 implementada e validada** (`typecheck`, `lint`, `format`, 24 testes Vitest e `next build` passando; banco Supabase e bucket privado `screening-audios` provisionados). Próxima etapa: **Sprint 2** (Agenda do Professor, Pareamento 1v2 Atômico e Check-in de 10 min).
 
 ---
 
