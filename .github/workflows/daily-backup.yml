@@ -1,0 +1,38 @@
+name: Daily Encrypted Database Backup
+
+# Executa pg_dump diário às 04:00 UTC via Supavisor Session Pooler IPv4,
+# criptografa com AES-256-CBC (OpenSSL) e retém como artefato privado por 14 dias.
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client openssl
+
+      - name: Dump and encrypt database
+        env:
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+        run: |
+          if [ -z "$SUPABASE_DB_POOLER_URL" ] || [ -z "$BACKUP_ENCRYPTION_KEY" ]; then
+            echo "Configure SUPABASE_DB_POOLER_URL (Session Pooler IPv4) e BACKUP_ENCRYPTION_KEY nos GitHub Secrets."
+            exit 1
+          fi
+          DATE_STAMP=$(date -u +"%Y-%m-%d")
+          pg_dump "$SUPABASE_DB_POOLER_URL" --no-owner --no-privileges \
+            | gzip \
+            | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_ENCRYPTION_KEY -out "backup-${DATE_STAMP}.sql.gz.enc"
+
+      - name: Upload encrypted backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup-*.sql.gz.enc
+          retention-days: 14

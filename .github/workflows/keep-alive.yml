@@ -1,0 +1,28 @@
+name: Supabase Keep-Alive
+
+# Executa segunda e quinta-feira às 12:00 UTC (09:00 BRT) para impedir pausa
+# por inatividade do Supabase Free Tier antes das janelas críticas de sexta e sábado.
+on:
+  schedule:
+    - cron: "0 12 * * 1,4"
+  workflow_dispatch:
+
+jobs:
+  ping-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /api/health endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "Secret APP_URL não configurado."
+            exit 1
+          fi
+          HTTP_STATUS=$(curl -s -o response.json -w "%{http_code}" "${APP_URL%/}/api/health")
+          cat response.json
+          echo ""
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Health-check falhou com HTTP $HTTP_STATUS"
+            exit 1
+          fi

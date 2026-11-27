@@ -1,0 +1,32 @@
+name: Daily LGPD 30-Day Retention Purge
+
+# Executa diariamente às 05:00 UTC o endpoint /api/cron/retention protegido por CRON_SECRET.
+on:
+  schedule:
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  purge-expired:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger LGPD 30-day retention endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Configure APP_URL e CRON_SECRET nos GitHub Secrets."
+            exit 1
+          fi
+          HTTP_STATUS=$(curl -s -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -o response.json \
+            -w "%{http_code}" \
+            "${APP_URL%/}/api/cron/retention")
+          cat response.json
+          echo ""
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Rotina de retenção falhou com HTTP $HTTP_STATUS"
+            exit 1
+          fi

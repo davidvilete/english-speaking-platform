@@ -27,6 +27,7 @@ const NAV_BY_ROLE: Record<UserRole, { href: string; label: string }[]> = {
   admin: [
     { href: "/admin", label: "Início" },
     { href: "/admin/subscriptions", label: "Assinaturas" },
+    { href: "/admin/logs", label: "Logs" },
     { href: "/teacher/schedule", label: "Agenda" },
     { href: "/teacher/post-class", label: "Pós-Aula" },
     { href: "/teacher/screening", label: "Triagens" },
